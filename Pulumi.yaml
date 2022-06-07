@@ -1,0 +1,7 @@
+name: heroku
+runtime:
+  name: python
+  options:
+    virtualenv: venv
+description: A minimal AWS Python Pulumi program. Used to create a heroku clone to
+  provision new VMs with flexibility and deploy static websites.
