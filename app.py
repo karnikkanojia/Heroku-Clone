@@ -8,14 +8,26 @@ def ensure_plugins():
     ws = auto.LocalWorkspace()
     ws.install_plugin("aws", "v4.0.0")
 
+
 def create_app():
     ensure_plugins()
+    app = Flask(__name__, instance_relative_config=True)
+    app.config.from_mapping(
+        SECRET_KEY="secret",
+        PROJECT_NAME="heroku-clone",
+        PULUMI_ORG=os.environ.get("PULUMI_ORG")
+    )
 
-app = Flask(__name__)
+    @app.route('/')
+    def index():
+        return render_template("index.html")
 
-@app.route('/')
-def hello_world():
-    return 'Hello World'
+    import sites
 
-if __name__ == "__main__":
-    app.run()
+    app.register_blueprint(sites.bp)
+
+    import virtual_machines
+
+    app.register_blueprint(virtual_machines.bp)
+
+    return app
