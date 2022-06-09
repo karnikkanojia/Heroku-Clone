@@ -14,7 +14,7 @@ def create_app():
     app = Flask(__name__, instance_relative_config=True)
     app.config.from_mapping(
         SECRET_KEY="secret",
-        PROJECT_NAME="heroku-clone",
+        PROJECT_NAME="heroku",
         PULUMI_ORG=os.environ.get("PULUMI_ORG")
     )
 
