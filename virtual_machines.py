@@ -1,27 +1,24 @@
-import os
-from pathlib import Path
 from flask import (
     Blueprint,
+    current_app,
     request,
+    flash,
     redirect,
     url_for,
     render_template,
-    current_app,
-    flash,
 )
 
 import pulumi
 import pulumi_aws as aws
 import pulumi.automation as auto
-from yaml import KeyToken
+import os
+from pathlib import Path
 
 bp = Blueprint("virtual_machines", __name__, url_prefix="/vms")
 instance_types = ["c5.xlarge", "p2.xlarge", "p3.2xlarge"]
 
 
-def create_pulumi_program(keydata: str, instance_type: str):
-    # Choose the latest minimal amzn2 Linux AMI.
-    # TODO: Make this something the user can choose.
+def create_pulumi_program(keydata: str, instance_type=str):
     ami = aws.ec2.get_ami(
         most_recent=True,
         owners=["amazon"],
@@ -30,7 +27,7 @@ def create_pulumi_program(keydata: str, instance_type: str):
 
     group = aws.ec2.SecurityGroup(
         "web-secgrp",
-        description="Enable SSH Access",
+        description="Enable SSH access",
         ingress=[
             aws.ec2.SecurityGroupIngressArgs(
                 protocol="tcp",
@@ -70,9 +67,7 @@ def create_pulumi_program(keydata: str, instance_type: str):
 
 @bp.route("/new", methods=["GET", "POST"])
 def create_vm():
-    """
-    Creates a new VM
-    """
+    """creates new VM"""
     if request.method == "POST":
         stack_name = request.form.get("vm-id")
         keydata = request.form.get("vm-keypair")
@@ -82,16 +77,16 @@ def create_vm():
             return create_pulumi_program(keydata, instance_type)
 
         try:
+
             stack = auto.create_stack(
                 stack_name=str(stack_name),
                 project_name=current_app.config["PROJECT_NAME"],
                 program=pulumi_program,
             )
-            stack.set_config("aws:region", auto.ConfigValue("ap-south-1"))
-
+            stack.set_config("aws:region", auto.ConfigValue("us-east-1"))
+    
             stack.up(on_output=print)
             flash(f"Successfully created VM '{stack_name}'", category="success")
-
         except auto.StackAlreadyExistsError:
             flash(
                 f"Error: VM with name '{stack_name}' already exists, pick a unique name",
@@ -107,11 +102,9 @@ def create_vm():
     )
 
 
-@bp.route("/")
+@bp.route("/", methods=["GET"])
 def list_vms():
-    """
-    List all the VMS on the stack currently
-    """
+    """lists all vms"""
     vms = []
     org_name = current_app.config["PULUMI_ORG"]
     project_name = current_app.config["PROJECT_NAME"]
@@ -119,26 +112,25 @@ def list_vms():
         ws = auto.LocalWorkspace(
             project_settings=auto.ProjectSettings(name=project_name, runtime="python")
         )
-
         all_stacks = ws.list_stacks()
         for stack in all_stacks:
             stack = auto.select_stack(
-                stack_name=stack.name, project_name=project_name, program=lambda: None
+                stack_name=stack.name,
+                project_name=project_name,
+        
+                program=lambda: None,
             )
-
             outs = stack.outputs()
-
             if "public_dns" in outs:
                 vms.append(
                     {
                         "name": stack.name,
                         "dns_name": f"{outs['public_dns'].value}",
                         "console_url": f"https://app.pulumi.com/{org_name}/{project_name}/{stack.name}",
-                    },
+                    }
                 )
-
-    except Exception as e:
-        flash(str(e), category="danger")
+    except Exception as exn:
+        flash(str(exn), category="danger")
 
     current_app.logger.info(f"VMS: {vms}")
     return render_template("virtual_machines/index.html", vms=vms)
@@ -150,7 +142,7 @@ def update_vm(id: str):
     if request.method == "POST":
         current_app.logger.info(f"Updating VM: {stack_name}, form data: {request.form}")
         keydata = request.form.get("vm-keypair")
-        current_app.logger.info(f"Updating Keydata: {keydata}")
+        current_app.logger.info(f"updating keydata: {keydata}")
         instance_type = request.form.get("instance_type")
 
         def pulumi_program():
@@ -162,8 +154,8 @@ def update_vm(id: str):
                 project_name=current_app.config["PROJECT_NAME"],
                 program=pulumi_program,
             )
-
-            stack.set_config("aws:region", auto.ConfigValue("ap-south-1"))
+            stack.set_config("aws:region", auto.ConfigValue("us-east-1"))
+    
             stack.up(on_output=print)
             flash(f"VM '{stack_name}' successfully updated!", category="success")
         except auto.ConcurrentUpdateError:
@@ -171,21 +163,20 @@ def update_vm(id: str):
                 f"Error: VM '{stack_name}' already has an update in progress",
                 category="danger",
             )
-        except Exception as e:
-            flash(str(e), category="danger")
-
+        except Exception as exn:
+            flash(str(exn), category="danger")
         return redirect(url_for("virtual_machines.list_vms"))
 
     stack = auto.select_stack(
         stack_name=stack_name,
         project_name=current_app.config["PROJECT_NAME"],
+
         program=lambda: None,
     )
     outs = stack.outputs()
     public_key = outs.get("public_key")
     pk = public_key.value if public_key else None
     instance_type = outs.get("instance_type")
-
     return render_template(
         "virtual_machines/update.html",
         name=stack_name,
@@ -195,19 +186,19 @@ def update_vm(id: str):
     )
 
 
-@bp.route("/<string:id>/delete")
+@bp.route("/<string:id>/delete", methods=["POST"])
 def delete_vm(id: str):
     stack_name = id
     try:
         stack = auto.select_stack(
             stack_name=stack_name,
             project_name=current_app.config["PROJECT_NAME"],
+    
             program=lambda: None,
         )
         stack.destroy(on_output=print)
         stack.workspace.remove_stack(stack_name)
         flash(f"VM '{stack_name}' successfully deleted!", category="success")
-
     except auto.ConcurrentUpdateError:
         flash(
             f"Error: VM '{stack_name}' already has update in progress",

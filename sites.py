@@ -18,15 +18,11 @@ bp = Blueprint("sites", __name__, url_prefix="/sites")
 
 
 def create_pulumi_program(content: str):
-    """
-    Helps in creating a bucket to store the data and expose the website
-    """
     site_bucket = s3.Bucket(
         "s3-website-bucket", website=s3.BucketWebsiteArgs(index_document="index.html")
     )
     index_content = content
 
-    # Transfer webiste index.html into the site bucket
     s3.BucketObject(
         "index",
         bucket=site_bucket.id,
@@ -35,7 +31,6 @@ def create_pulumi_program(content: str):
         content_type="text/html; charset=utf-8",
     )
 
-    # Set the access policy for the bucket so all objects are readable
     s3.BucketPolicy(
         "bucket-policy",
         bucket=site_bucket.id,
@@ -47,6 +42,7 @@ def create_pulumi_program(content: str):
                         "Effect": "Allow",
                         "Principal": "*",
                         "Action": ["s3:GetObject"],
+
                         "Resource": [f"arn:aws:s3:::{id}/*"],
                     },
                 }
@@ -60,9 +56,7 @@ def create_pulumi_program(content: str):
 
 @bp.route("/new", methods=["GET", "POST"])
 def create_site():
-    """
-    Helps in creating new sites
-    """
+    """creates new sites"""
     if request.method == "POST":
         stack_name = request.form.get("site-id")
         file_url = request.form.get("file-url")
@@ -75,16 +69,16 @@ def create_site():
             return create_pulumi_program(str(site_content))
 
         try:
+    
             stack = auto.create_stack(
                 stack_name=str(stack_name),
                 project_name=current_app.config["PROJECT_NAME"],
                 program=pulumi_program,
             )
-
-            stack.set_config("aws:region", auto.ConfigValue("ap-south-1"))
+            stack.set_config("aws:region", auto.ConfigValue("us-east-1"))
+    
             stack.up(on_output=print)
             flash(f"Successfully created site '{stack_name}'", category="success")
-
         except auto.StackAlreadyExistsError:
             flash(
                 f"Error: Site with name '{stack_name}' already exists, pick a unique name",
@@ -96,11 +90,9 @@ def create_site():
     return render_template("sites/create.html")
 
 
-@bp.route("/")
+@bp.route("/", methods=["GET"])
 def list_sites():
-    """
-    List all the sites hosted on the current user
-    """
+    """lists all sites"""
     sites = []
     org_name = current_app.config["PULUMI_ORG"]
     project_name = current_app.config["PROJECT_NAME"]
@@ -111,7 +103,10 @@ def list_sites():
         all_stacks = ws.list_stacks()
         for stack in all_stacks:
             stack = auto.select_stack(
-                stack_name=stack.name, project_name=project_name, program=lambda: None
+                stack_name=stack.name,
+                project_name=project_name,
+        
+                program=lambda: None,
             )
             outs = stack.outputs()
             if "website_url" in outs:
@@ -122,14 +117,13 @@ def list_sites():
                         "console_url": f"https://app.pulumi.com/{org_name}/{project_name}/{stack.name}",
                     }
                 )
-
-    except Exception as e:
-        flash(str(e), category="danger")
+    except Exception as exn:
+        flash(str(exn), category="danger")
 
     return render_template("sites/index.html", sites=sites)
 
 
-@bp.route("/<string:id>/update")
+@bp.route("/<string:id>/update", methods=["GET", "POST"])
 def update_site(id: str):
     stack_name = id
 
@@ -150,11 +144,10 @@ def update_site(id: str):
                 project_name=current_app.config["PROJECT_NAME"],
                 program=pulumi_program,
             )
-
-            stack.set_config("aws:region", auto.ConfigValue("ap-south-1"))
+            stack.set_config("aws:region", auto.ConfigValue("us-east-1"))
+    
             stack.up(on_output=print)
             flash(f"Site '{stack_name}' successfully updated!", category="success")
-
         except auto.ConcurrentUpdateError:
             flash(
                 f"Error: site '{stack_name}' already has an update in progress",
@@ -167,25 +160,25 @@ def update_site(id: str):
     stack = auto.select_stack(
         stack_name=stack_name,
         project_name=current_app.config["PROJECT_NAME"],
+
         program=lambda: None,
     )
-
     outs = stack.outputs()
     content_output = outs.get("website_content")
     content = content_output.value if content_output else None
-
     return render_template("sites/update.html", name=stack_name, content=content)
+
 
 @bp.route("/<string:id>/delete", methods=["POST"])
 def delete_site(id: str):
     stack_name = id
     try:
-        stack=auto.select_stack(
+        stack = auto.select_stack(
             stack_name=stack_name,
             project_name=current_app.config["PROJECT_NAME"],
-            program=lambda: None
+    
+            program=lambda: None,
         )
-
         stack.destroy(on_output=print)
         stack.workspace.remove_stack(stack_name)
         flash(f"Site '{stack_name}' successfully deleted!", category="success")

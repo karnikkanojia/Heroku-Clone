@@ -1,8 +1,10 @@
 import os
 from flask import Flask, render_template
+from dotenv import load_dotenv
 
 import pulumi.automation as auto
 
+load_dotenv()
 
 def ensure_plugins():
     ws = auto.LocalWorkspace()
