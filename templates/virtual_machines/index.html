@@ -2,7 +2,7 @@
 
 {% block nav %}
 <ul class="nav nav-pills">
-    <li class="nav-item fs-6"><a href="{{ url_for(" virtual_machines.create_vm") }}" class="nav-link active">Create
+    <li class="nav-item fs-6"><a href="{{ url_for("virtual_machines.create_vm") }}" class="nav-link active">Create
             VM</a></li>
 </ul>
 {% endblock %}
@@ -19,7 +19,7 @@
             <div class="row py-4">
                 <div class="alert alert-secondary" role="alert">
                     <p>No virtual machines are currently deployed. Create one to get started!</p>
-                    <a href="{{ url_for(" virtual_machines.create_vm") }}" class="btn btn-primary">Create VM</a>
+                    <a href="{{ url_for("virtual_machines.create_vm") }}" class="btn btn-primary">Create VM</a>
                 </div>
             </div>
         </div>
@@ -33,17 +33,17 @@
             </td>
             <td>
                 <div class="float-end p-1">
-                    <form action="{{ url_for(" virtual_machines.delete_vm", id=vm["name"]) }}" method="post">
+                    <form action="{{ url_for("virtual_machines.delete_vm", id=vm["name"]) }}" method="post">
                         <input class="btn btn-sm btn-danger" type="submit" value="Delete">
                     </form>
                 </div>
                 <div class="float-end p-1">
-                    <form action="{{ url_for(" virtual_machines.update_vm", id=vm["name"]) }}" method="get">
+                    <form action="{{ url_for("virtual_machines.update_vm", id=vm["name"]) }}" method="get">
                         <input class="btn btn-sm btn-primary" type="submit" value="Edit">
                     </form>
                 </div>
                 <div class="float-end p-1">
-                    <a href="{{ vm[" console_url"] }}" class="btn btn-sm btn-outline-primary" target="_blank">View in
+                    <a href="{{ vm["console_url"] }}" class="btn btn-sm btn-outline-primary" target="_blank">View in
                         console</a>
                 </div>
             </td>
